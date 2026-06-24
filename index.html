@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>芭比梦想豪宅</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1020;overflow:hidden;height:100vh;font-family:'PingFang SC',serif;}
+canvas{display:block;}
+.loading{
+  position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+  background:#1a1020;color:#ffb8d0;font-size:0.85rem;letter-spacing:4px;
+  transition:opacity 0.6s;pointer-events:none;
+}
+.loading.done{opacity:0;}
+</style>
+</head>
+<body>
+<div class="loading" id="loading">✦ 欢迎来到芭比梦想豪宅 ✦</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ===== RENDERER =====
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+// ===== SCENE =====
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x1a1020);
+scene.fog=new THREE.FogExp2(0x2a1830,0.00003);
+
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.3,35);
+camera.position.set(5,3.5,6);camera.lookAt(0,1.8,0);
+
+// ===== POST =====
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.4,0.3,0.85);
+bloom.threshold=0.65;bloom.strength=0.18;bloom.radius=0.7;
+composer.addPass(bloom);
+
+// ===== LIGHTING =====
+scene.add(new THREE.AmbientLight(0x2a1828,1.8));
+const sun=new THREE.DirectionalLight(0xffeedd,18);
+sun.position.set(-5,8,4);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.near=0.3;sun.shadow.camera.far=22;
+sun.shadow.camera.left=-8;sun.shadow.camera.right=8;
+sun.shadow.camera.top=6;sun.shadow.camera.bottom=-4;
+sun.shadow.bias=-0.0002;
+scene.add(sun);
+scene.add(new THREE.DirectionalLight(0xffccee,3).position.set(3,2,-2));
+
+// ===== HOUSE STRUCTURE =====
+const house=new THREE.Group();scene.add(house);
+
+// Pink glossy floor
+const floorGeo=new THREE.PlaneGeometry(10,8);
+const floorMat=new THREE.MeshStandardMaterial({color:0xf5d0e0,roughness:0.15,metalness:0.05});
+const floor=new THREE.Mesh(floorGeo,floorMat);
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;house.add(floor);
+
+// Floor grid lines (tile pattern)
+for(let i=0;i<6;i++){
+  const line=new THREE.Mesh(new THREE.BoxGeometry(10,0.003,0.02),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.12,depthWrite:false}));
+  line.position.set(0,0.005,-3+i*1.2);house.add(line);
+}
+
+// Circular pink rug
+const rug=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.6,0.02,32),new THREE.MeshStandardMaterial({color:0xffb0c8,roughness:0.8,metalness:0}));
+rug.position.set(0,0.01,0.5);rug.receiveShadow=true;house.add(rug);
+
+// === WALLS ===
+const pinkWall=new THREE.MeshStandardMaterial({color:0xffb8d0,roughness:0.6,metalness:0.02});
+const whiteWall=new THREE.MeshStandardMaterial({color:0xfaf0f5,roughness:0.5,metalness:0.02});
+
+// Back wall (half-height, open plan)
+const backW=new THREE.Mesh(new THREE.PlaneGeometry(10,1.5),pinkWall);
+backW.position.set(0,0.75,-3.8);backW.receiveShadow=true;house.add(backW);
+
+// Side walls (pink with white stripes)
+for(let sx of[-1,1]){
+  const w=new THREE.Mesh(new THREE.PlaneGeometry(8,1.5),pinkWall);
+  w.rotation.y=sx*Math.PI/2;w.position.set(sx*5,0.75,0);house.add(w);
+}
+
+// === WHITE PILLARS ===
+for(let x of[-3.5,0,3.5]){
+  for(let z of[-3,3]){
+    const pillar=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.14,3.8,16),whiteWall);
+    pillar.position.set(x,1.9,z);pillar.castShadow=true;pillar.receiveShadow=true;house.add(pillar);
+    // Gold ring at top
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(0.16,0.03,8,16),new THREE.MeshStandardMaterial({color:0xe8c860,roughness:0.2,metalness:0.8}));
+    ring.position.set(x,3.7,z);ring.rotation.x=Math.PI/2;house.add(ring);
+  }
+}
+
+// Gold railing (back)
+for(let i=0;i<7;i++){
+  const railPost=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.03,0.9,8),new THREE.MeshStandardMaterial({color:0xe8c860,roughness:0.2,metalness:0.7}));
+  railPost.position.set(-3+i*1,1.2,-3.6);railPost.castShadow=true;house.add(railPost);
+  if(i<6){
+    const railBar=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,1,6),new THREE.MeshStandardMaterial({color:0xe8c860,roughness:0.2,metalness:0.7}));
+    railBar.rotation.z=Math.PI/2;railBar.position.set(-2.5+i*1,0.75,-3.6);house.add(railBar);
+    const railBar2=railBar.clone();railBar2.position.y=1.45;house.add(railBar2);
+  }
+}
+
+// Back view - painted backdrop (pink-purple gradient panel)
+const backdropGeo=new THREE.PlaneGeometry(9,2.5);
+const backdropMat=new THREE.MeshBasicMaterial({color:0xe8a0c8,transparent:true,opacity:0.4,side:THREE.DoubleSide,depthWrite:false});
+const backdrop=new THREE.Mesh(backdropGeo,backdropMat);
+backdrop.position.set(0,2,-3.5);house.add(backdrop);
+
+// Palm trees (silhouette on backdrop)
+for(let i=0;i<3;i++){
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.06,1.2,8),new THREE.MeshBasicMaterial({color:0x403040,transparent:true,opacity:0.5,depthWrite:false}));
+  trunk.position.set(-2.5+i*2.5,1.8,-3.4);house.add(trunk);
+  for(let j=0;j<5;j++){
+    const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.04,6),new THREE.MeshBasicMaterial({color:0x504060,transparent:true,opacity:0.4,depthWrite:false}));
+    leaf.position.set(-2.5+i*2.5+Math.cos(j*1.2)*0.2,2.5+Math.sin(j*0.8)*0.15,-3.4);
+    leaf.rotation.z=Math.random()*0.5;house.add(leaf);
+  }
+}
+
+// === SPIRAL STAIRCASE ===
+const stairGroup=new THREE.Group();stairGroup.position.set(3.5,0,-1);house.add(stairGroup);
+const goldMetal=new THREE.MeshStandardMaterial({color:0xe8c860,roughness:0.2,metalness:0.75});
+const stairPink=new THREE.MeshStandardMaterial({color:0xffb8d0,roughness:0.3,metalness:0.05});
+
+// Central pole
+const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,3.5,16),goldMetal);
+pole.position.y=1.75;pole.castShadow=true;stairGroup.add(pole);
+
+// Steps spiraling up
+for(let i=0;i<10;i++){
+  const stepGeo=new THREE.BoxGeometry(0.5,0.05,0.3);
+  const step=new THREE.Mesh(stepGeo,stairPink);
+  const angle=i*0.8;const h=i*0.35;
+  step.position.set(Math.cos(angle)*0.4,h+0.2,Math.sin(angle)*0.4);
+  step.rotation.y=angle;step.castShadow=true;stairGroup.add(step);
+  // Gold edge on step
+  const edge=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.01,0.04),goldMetal);
+  edge.position.set(Math.cos(angle)*0.4,h+0.23,Math.sin(angle)*0.4);
+  edge.rotation.y=angle;stairGroup.add(edge);
+}
+
+// === CRYSTAL CHANDELIER ===
+const chandelier=new THREE.Group();chandelier.position.set(0,3.6,0.3);house.add(chandelier);
+// Chain
+chandelier.add(new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.6,6),goldMetal).position.set(0,0.3,0));
+// Central ring
+chandelier.add(new THREE.Mesh(new THREE.TorusGeometry(0.3,0.03,8,16),goldMetal).position.set(0,-0.1,0));
+chandelier.add(new THREE.Mesh(new THREE.TorusGeometry(0.5,0.03,8,16),goldMetal).position.set(0,-0.4,0));
+chandelier.add(new THREE.Mesh(new THREE.TorusGeometry(0.7,0.03,8,16),goldMetal).position.set(0,-0.7,0));
+// Crystals (small glowing spheres)
+for(let ring=0;ring<3;ring++){
+  const r=0.3+ring*0.2;const h=-0.1-ring*0.3;const count=8+ring*4;
+  for(let i=0;i<count;i++){
+    const angle=i/count*Math.PI*2;
+    const crystal=new THREE.Mesh(new THREE.SphereGeometry(0.04,6,6),new THREE.MeshStandardMaterial({color:0xffe8f0,roughness:0.1,metalness:0.3,emissive:0xffd0e0,emissiveIntensity:0.3}));
+    crystal.position.set(Math.cos(angle)*r,h,Math.sin(angle)*r);chandelier.add(crystal);
+  }
+}
+// Center light
+const chandelierLight=new THREE.PointLight(0xffd0e8,6,5);
+chandelierLight.position.set(0,-0.3,0);chandelier.add(chandelierLight);
+
+// === PINK VELVET SOFA ===
+const sofa=new THREE.Group();sofa.position.set(-1.5,0,1.5);sofa.rotation.y=0.3;house.add(sofa);
+const velvetMat=new THREE.MeshStandardMaterial({color:0xe87090,roughness:0.6,metalness:0.03});
+// Seat
+sofa.add(new THREE.Mesh(new THREE.BoxGeometry(1.8,0.3,0.8),velvetMat).position.set(0,0.5,0));
+// Back
+sofa.add(new THREE.Mesh(new THREE.BoxGeometry(1.8,0.6,0.15),velvetMat).position.set(0,0.85,-0.35));
+// Arms
+for(let sx of[-1,1]){sofa.add(new THREE.Mesh(new THREE.BoxGeometry(0.15,0.3,0.7),velvetMat).position.set(sx*0.85,0.55,0.05));}
+// Pink cushions
+const cushMat=new THREE.MeshStandardMaterial({color:0xf5c0d0,roughness:0.7,metalness:0});
+for(let i=0;i<2;i++){const c=new THREE.Mesh(new THREE.SphereGeometry(0.16,12,8).scale(1,0.5,0.7),cushMat);c.position.set(-0.3+i*0.6,0.7,0);sofa.add(c);}
+// Gold legs
+for(let sx of[-1,1]){for(let sz of[-1,1]){sofa.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.04,0.25,8),goldMetal).position.set(sx*0.8,0.12,sz*0.35));}}
+
+// === VANITY TABLE ===
+const vanity=new THREE.Group();vanity.position.set(2,0,-2.5);house.add(vanity);
+// Table
+const tableTop=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.04,0.5),whiteWall);tableTop.position.y=0.75;vanity.add(tableTop);
+// Gold legs
+for(let sx of[-1,1]){for(let sz of[-1,1]){vanity.add(new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.03,0.73,8),goldMetal).position.set(sx*0.5,0.37,sz*0.2));}}
+// Mirror frame
+const mirrorFrame=new THREE.Mesh(new THREE.TorusGeometry(0.38,0.03,8,12),goldMetal);
+mirrorFrame.position.set(0,1.2,-0.2);vanity.add(mirrorFrame);
+// Mirror glass
+const mirrorGlass=new THREE.Mesh(new THREE.CircleGeometry(0.35,16),new THREE.MeshStandardMaterial({color:0xe8e0f0,roughness:0.1,metalness:0.6}));
+mirrorGlass.position.set(0,1.2,-0.18);vanity.add(mirrorGlass);
+// Perfume bottles
+for(let i=0;i<3;i++){
+  const bottle=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,0.12,8),new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(0.85+Math.random()*0.1,0.5,0.7+Math.random()*0.3),roughness:0.2,metalness:0.3}));
+  bottle.position.set(-0.3+i*0.3,0.83,-0.1);vanity.add(bottle);
+}
+// Stool
+const stoolSeat=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.22,0.08,16),new THREE.MeshStandardMaterial({color:0xffc0d0,roughness:0.5,metalness:0.05}));
+stoolSeat.position.set(0,0.5,-0.6);vanity.add(stoolSeat);
+vanity.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.04,0.48,8),goldMetal).position.set(0,0.25,-0.6));
+
+// === NEON HEART ===
+const heartGroup=new THREE.Group();heartGroup.position.set(0,2.8,3.2);house.add(heartGroup);
+// Create heart shape
+const heartShape=new THREE.Shape();
+heartShape.moveTo(0,0.15);
+heartShape.bezierCurveTo(0,0.3,0.2,0.4,0.4,0.4);
+heartShape.bezierCurveTo(0.6,0.4,0.7,0.2,0.7,0);
+heartShape.bezierCurveTo(0.7,-0.2,0.4,-0.5,0,-0.7);
+heartShape.bezierCurveTo(-0.4,-0.5,-0.7,-0.2,-0.7,0);
+heartShape.bezierCurveTo(-0.7,0.2,-0.6,0.4,-0.4,0.4);
+heartShape.bezierCurveTo(-0.2,0.4,0,0.3,0,0.15);
+const heartGeo=new THREE.ExtrudeGeometry(heartShape,{depth:0.05,bevelEnabled:true,bevelThickness:0.02,bevelSize:0.02,bevelSegments:3});
+const heartMesh=new THREE.Mesh(heartGeo,new THREE.MeshStandardMaterial({color:0xff3080,roughness:0.15,metalness:0.1,emissive:0xff1060,emissiveIntensity:0.8}));
+heartMesh.scale.set(0.6,0.6,0.6);heartGroup.add(heartMesh);
+
+// === CAT (white Persian) ===
+const cat=new THREE.Group();cat.position.set(1,0.01,2.5);house.add(cat);
+const catWhite=new THREE.MeshStandardMaterial({color:0xfaf5f0,roughness:0.5,metalness:0});
+const catPink=new THREE.MeshStandardMaterial({color:0xffb8c8,roughness:0.4,metalness:0});
+
+// Body (fluffy)
+const catBody=new THREE.Mesh(new THREE.SphereGeometry(0.14,10,8).scale(1,0.7,1.3),catWhite);
+catBody.position.y=0.2;catBody.castShadow=true;cat.add(catBody);
+// Head
+const catHead=new THREE.Mesh(new THREE.SphereGeometry(0.1,10,8),catWhite);
+catHead.position.set(0,0.3,0.18);cat.add(catHead);
+// Ears
+for(let sx of[-1,1]){const ear=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.08,6),catPink);ear.position.set(sx*0.06,0.36,0.15);ear.rotation.z=sx*0.3;catHead.add(ear);}
+// Eyes
+for(let sx of[-1,1]){catHead.add(new THREE.Mesh(new THREE.SphereGeometry(0.025,6,6),new THREE.MeshStandardMaterial({color:0x4488cc,roughness:0.2})).position.set(sx*0.035,0.32,0.2));catHead.add(new THREE.Mesh(new THREE.SphereGeometry(0.012,6,6),new THREE.MeshStandardMaterial({color:0x111,roughness:0.1})).position.set(sx*0.035,0.318,0.215));}
+// Nose
+catHead.add(new THREE.Mesh(new THREE.SphereGeometry(0.01,4,4),catPink).position.set(0,0.29,0.22));
+// Gold collar
+cat.add(new THREE.Mesh(new THREE.TorusGeometry(0.1,0.015,8,8),goldMetal).position.set(0,0.22,0.08));
+// Tail
+const tailCurve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0.08,-0.1),new THREE.Vector3(0.03,0.18,-0.18),new THREE.Vector3(0.06,0.28,-0.1)]);
+const tailGroup=new THREE.Group();tailGroup.position.set(0,0.2,-0.15);cat.add(tailGroup);
+tailGroup.add(new THREE.Mesh(new THREE.TubeGeometry(tailCurve,14,0.025,8,false),catWhite));
+// Legs
+for(let sx of[-1,1]){for(let sz of[-1,1]){cat.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.035,0.12,6),catWhite).position.set(sx*0.07,0.06,sz*0.08));}}
+
+// Cat AI
+let catState='idle',catTimer=0,catTarget=new THREE.Vector3(),catTime=0;
+const catBase=cat.position.clone();
+function updateCat(dt){
+  catTimer-=dt;catTime+=dt;
+  if(catTimer<=0){
+    const r=Math.random();
+    catState=r<0.35?'idle':r<0.7?'walking':r<0.9?'sitting':'grooming';
+    catTimer=1.5+Math.random()*4;
+    if(catState==='walking'){catTarget.set(catBase.x+(Math.random()-0.5)*5,0.01,catBase.z+(Math.random()-0.5)*4);catTarget.x=THREE.MathUtils.clamp(catTarget.x,-4,4);catTarget.z=THREE.MathUtils.clamp(catTarget.z,-3,3);}
+  }
+  if(catState==='walking'){
+    const dx=catTarget.x-cat.position.x,dz=catTarget.z-cat.position.z,dist=Math.sqrt(dx*dx+dz*dz);
+    if(dist>0.05){cat.position.x+=dx/dist*0.6*dt;cat.position.z+=dz/dist*0.6*dt;cat.rotation.y+=(Math.atan2(dx,dz)-cat.rotation.y)*3*dt;cat.position.y=0.01+Math.abs(Math.sin(catTime*8))*0.025;}
+    else{catState='idle';catTimer=0.5;}
+  }
+  tailGroup.rotation.x=0.4+Math.sin(catTime*3)*0.3;tailGroup.rotation.z=Math.sin(catTime*2.5)*0.3;
+}
+
+// ===== ANIMATION =====
+const clock=new THREE.Clock();let time=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.1);time+=dt;
+
+  // Camera gentle orbit
+  camera.position.x+=(Math.cos(time*0.15)*6-camera.position.x)*0.008;
+  camera.position.z+=(Math.sin(time*0.15)*6-camera.position.z)*0.008;
+  camera.position.y+=(3.5+Math.sin(time*0.2)*0.5-camera.position.y)*0.008;
+  camera.lookAt(0,1.6,0);
+
+  // Chandelier spin & light
+  chandelier.rotation.y+=dt*0.3;
+  chandelierLight.intensity=6+Math.sin(time*2)*0.5;
+
+  // Heart pulse
+  const pulse=1+Math.sin(time*2.5)*0.04;heartMesh.scale.setScalar(0.6*pulse);
+  heartMesh.material.emissiveIntensity=0.7+Math.sin(time*3)*0.2;
+
+  // Cat
+  updateCat(dt);
+
+  composer.render();
+}
+animate();
+
+// ===== START =====
+setTimeout(()=>document.getElementById('loading').classList.add('done'),800);
+
+window.addEventListener('resize',()=>{
+  renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+});
+</script>
+</body>
+</html>
